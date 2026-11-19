@@ -9,7 +9,11 @@ import java.awt.event.*;
 
 import model.Maze;
 import model.Difficulty;
+
 import algorithm.MazeGenerator;
+import algorithm.BFS;
+import algorithm.DFS;
+import algorithm.Pathfinder;
 
 public class MazeFrame extends JFrame {
 
@@ -37,7 +41,6 @@ public class MazeFrame extends JFrame {
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(Theme.BACKGROUND);
 
-        // Reduced header spacing
         headerPanel.setBorder(
             BorderFactory.createEmptyBorder(8, 20, 5, 20)
         );
@@ -50,6 +53,7 @@ public class MazeFrame extends JFrame {
         titleLabel.setFont(
             new Font("Serif", Font.BOLD, 26)
         );
+
         titleLabel.setForeground(Theme.TEXT);
 
         JLabel subtitleLabel = new JLabel(
@@ -60,6 +64,7 @@ public class MazeFrame extends JFrame {
         subtitleLabel.setFont(
             new Font("SansSerif", Font.PLAIN, 11)
         );
+
         subtitleLabel.setForeground(Theme.STONE);
 
         headerPanel.add(titleLabel, BorderLayout.CENTER);
@@ -76,6 +81,7 @@ public class MazeFrame extends JFrame {
         statusLabel.setFont(
             new Font("Monospaced", Font.PLAIN, 12)
         );
+
         statusLabel.setForeground(Theme.TEXT);
 
         // Create maze panel
@@ -95,12 +101,11 @@ public class MazeFrame extends JFrame {
 
         // Control panel
         JPanel controlPanel = new JPanel(
-            new FlowLayout(FlowLayout.CENTER, 12, 12)
+            new FlowLayout(FlowLayout.CENTER, 10, 12)
         );
 
         controlPanel.setBackground(Theme.PATH);
 
-        // Reduced control panel spacing
         controlPanel.setBorder(
             BorderFactory.createEmptyBorder(4, 12, 4, 12)
         );
@@ -119,7 +124,7 @@ public class MazeFrame extends JFrame {
         JComboBox<Difficulty> difficultyBox =
             createDifficultyBox();
 
-        // Buttons
+        // Existing buttons
         JButton generateButton =
             createButton("Generate Maze");
 
@@ -128,6 +133,16 @@ public class MazeFrame extends JFrame {
 
         JButton endButton =
             createButton("Set End");
+
+        // New pathfinding buttons
+        JButton bfsButton =
+            createButton("BFS");
+
+        JButton dfsButton =
+            createButton("DFS");
+
+        JButton clearButton =
+            createButton("Clear Path");
 
         // Add controls
         controlPanel.add(rowsLabel);
@@ -143,6 +158,10 @@ public class MazeFrame extends JFrame {
         controlPanel.add(startButton);
         controlPanel.add(endButton);
 
+        controlPanel.add(bfsButton);
+        controlPanel.add(dfsButton);
+        controlPanel.add(clearButton);
+
         bottomPanel.add(controlPanel, BorderLayout.CENTER);
 
         // Status bar
@@ -150,7 +169,6 @@ public class MazeFrame extends JFrame {
 
         statusPanel.setBackground(Theme.BACKGROUND);
 
-        // Reduced status bar spacing
         statusPanel.setBorder(
             BorderFactory.createEmptyBorder(6, 10, 8, 10)
         );
@@ -237,11 +255,97 @@ public class MazeFrame extends JFrame {
             mazePanel.selectEnd();
         });
 
+        // BFS button
+        bfsButton.addActionListener(e -> {
+            runBFS();
+        });
+
+        // DFS button
+        dfsButton.addActionListener(e -> {
+            runDFS();
+        });
+
+        // Clear Path button
+        clearButton.addActionListener(e -> {
+
+            mazePanel.clearPathfinding();
+
+            statusLabel.setText(
+                "Pathfinding highlights cleared."
+            );
+        });
+
         // Window settings
         setSize(900, 700);
         setMinimumSize(new Dimension(650, 500));
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    // Run Breadth-First Search
+    private void runBFS() {
+
+        mazePanel.clearPathfinding();
+
+        statusLabel.setText("BFS is exploring the maze...");
+
+        Pathfinder result = BFS.findPath(maze);
+
+        displayResult(result, "BFS");
+    }
+
+    // Run Depth-First Search
+    private void runDFS() {
+
+        mazePanel.clearPathfinding();
+
+        statusLabel.setText("DFS is exploring the maze...");
+
+        Pathfinder result = DFS.findPath(maze);
+
+        displayResult(result, "DFS");
+    }
+
+    // Display pathfinding results
+    private void displayResult(
+            Pathfinder result,
+            String algorithmName) {
+
+        mazePanel.setPathfinderResult(result);
+
+        if (result == null) {
+
+            statusLabel.setText(
+                algorithmName + ": No result returned."
+            );
+
+            return;
+        }
+
+        int visitedCount =
+            result.getVisitedCells().size();
+
+        if (result.isPathFound()) {
+
+            int pathLength =
+                result.getPath().size();
+
+            statusLabel.setText(
+                algorithmName
+                + " | Path found! Visited: "
+                + visitedCount
+                + " | Path length: "
+                + pathLength
+            );
+
+        } else {
+
+            statusLabel.setText(
+                algorithmName
+                + " | No path found. Visited: "
+                + visitedCount
+            );
+        }
     }
 
     // Create maze scroll pane

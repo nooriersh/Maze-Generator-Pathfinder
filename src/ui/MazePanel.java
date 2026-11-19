@@ -2,6 +2,8 @@
 package ui;
 
 import model.Maze;
+import model.Cell;
+import algorithm.Pathfinder;
 
 import javax.swing.JPanel;
 
@@ -32,6 +34,10 @@ public class MazePanel extends JPanel {
 
     private Consumer<String> statusListener;
 
+    // Pathfinding visualization
+    private boolean[][] visitedCells;
+    private boolean[][] solutionPath;
+
     // Pixel-art colours
     private static final Color WALL_DARK =
         new Color(57, 82, 65);
@@ -48,9 +54,22 @@ public class MazePanel extends JPanel {
     private static final Color PATH_DARK =
         new Color(196, 177, 141);
 
+    // New pathfinding colours
+    private static final Color VISITED_COLOR =
+        new Color(151, 177, 126);
+
+    private static final Color SOLUTION_COLOR =
+        new Color(224, 177, 91);
+
     public MazePanel(Maze maze) {
 
         this.maze = maze;
+
+        visitedCells =
+            new boolean[maze.getRows()][maze.getCols()];
+
+        solutionPath =
+            new boolean[maze.getRows()][maze.getCols()];
 
         setBackground(Theme.BACKGROUND);
         setPreferredSize(new Dimension(600, 500));
@@ -97,11 +116,13 @@ public class MazePanel extends JPanel {
                     if (selectionMode.equals("START")) {
 
                         maze.setStart(row, col);
+                        clearPathfinding();
                         updateStatus("Start position updated.");
 
                     } else if (selectionMode.equals("END")) {
 
                         maze.setEnd(row, col);
+                        clearPathfinding();
                         updateStatus("End position updated.");
                     }
 
@@ -115,16 +136,77 @@ public class MazePanel extends JPanel {
         });
     }
 
+    // Select Start
     public void selectStart() {
 
         selectionMode = "START";
         updateStatus("Select a cell for START.");
     }
 
+    // Select End
     public void selectEnd() {
 
         selectionMode = "END";
         updateStatus("Select a cell for END.");
+    }
+
+    // Receive results from BFS or DFS
+    public void setPathfinderResult(Pathfinder result) {
+
+        clearPathfinding();
+
+        if (result == null) {
+            repaint();
+            return;
+        }
+
+        // Store visited cells
+        for (Cell cell : result.getVisitedCells()) {
+
+            int row = cell.getRow();
+            int col = cell.getCol();
+
+            if (isValidCell(row, col)) {
+                visitedCells[row][col] = true;
+            }
+        }
+
+        // Store final solution path
+        for (Cell cell : result.getPath()) {
+
+            int row = cell.getRow();
+            int col = cell.getCol();
+
+            if (isValidCell(row, col)) {
+                solutionPath[row][col] = true;
+            }
+        }
+
+        repaint();
+    }
+
+    // Clear previous visualization
+    public void clearPathfinding() {
+
+        for (int row = 0; row < maze.getRows(); row++) {
+
+            for (int col = 0; col < maze.getCols(); col++) {
+
+                visitedCells[row][col] = false;
+                solutionPath[row][col] = false;
+            }
+        }
+
+        repaint();
+    }
+
+    // Check whether coordinates are valid
+    private boolean isValidCell(int row, int col) {
+
+        return row >= 0
+            && row < maze.getRows()
+            && col >= 0
+            && col < maze.getCols();
     }
 
     public void setStatusListener(
@@ -140,6 +222,7 @@ public class MazePanel extends JPanel {
         }
     }
 
+    // Calculate cell size dynamically
     private void updateCellSize() {
 
         int availableWidth =
@@ -175,12 +258,13 @@ public class MazePanel extends JPanel {
 
         Graphics2D g2 = (Graphics2D) g.create();
 
-        // Keep the artwork sharp and pixelated
+        // Keep artwork pixelated
         g2.setRenderingHint(
             RenderingHints.KEY_ANTIALIASING,
             RenderingHints.VALUE_ANTIALIAS_OFF
         );
 
+        // First draw walls and pathways
         for (int row = 0; row < maze.getRows(); row++) {
 
             for (int col = 0; col < maze.getCols(); col++) {
@@ -196,6 +280,38 @@ public class MazePanel extends JPanel {
                 } else {
                     drawPath(g2, x, y, row, col);
                 }
+            }
+        }
+
+        // Second draw visited cells and solution path
+        for (int row = 0; row < maze.getRows(); row++) {
+
+            for (int col = 0; col < maze.getCols(); col++) {
+
+                int x = offsetX + col * cellSize;
+                int y = offsetY + row * cellSize;
+
+                if (maze.getCell(row, col).isWall()) {
+                    continue;
+                }
+
+                if (visitedCells[row][col]) {
+                    drawVisitedCell(g2, x, y);
+                }
+
+                if (solutionPath[row][col]) {
+                    drawSolutionCell(g2, x, y);
+                }
+            }
+        }
+
+        // Finally draw Start and End markers on top
+        for (int row = 0; row < maze.getRows(); row++) {
+
+            for (int col = 0; col < maze.getCols(); col++) {
+
+                int x = offsetX + col * cellSize;
+                int y = offsetY + row * cellSize;
 
                 if (row == maze.getStartRow()
                         && col == maze.getStartCol()) {
@@ -213,6 +329,63 @@ public class MazePanel extends JPanel {
         g2.dispose();
     }
 
+    // Draw explored cells
+    private void drawVisitedCell(
+            Graphics2D g, int x, int y) {
+
+        g.setColor(VISITED_COLOR);
+
+        g.fillRect(
+            x, y,
+            cellSize,
+            cellSize
+        );
+
+        g.setColor(Theme.BORDER);
+
+        g.drawRect(
+            x, y,
+            cellSize - 1,
+            cellSize - 1
+        );
+    }
+
+    // Draw final solution path
+    private void drawSolutionCell(
+            Graphics2D g, int x, int y) {
+
+        g.setColor(SOLUTION_COLOR);
+
+        g.fillRect(
+            x, y,
+            cellSize,
+            cellSize
+        );
+
+        if (cellSize >= 12) {
+
+            int pixel = Math.max(2, cellSize / 8);
+
+            // Small pixel highlight
+            g.setColor(PATH_LIGHT);
+
+            g.fillRect(
+                x + pixel,
+                y + pixel,
+                pixel * 2,
+                pixel
+            );
+        }
+
+        g.setColor(Theme.BORDER);
+
+        g.drawRect(
+            x, y,
+            cellSize - 1,
+            cellSize - 1
+        );
+    }
+
     // Moss-covered stone wall
     private void drawWall(
             Graphics2D g, int x, int y,
@@ -227,6 +400,7 @@ public class MazePanel extends JPanel {
 
             // Stone highlight
             g.setColor(WALL_LIGHT);
+
             g.fillRect(
                 x + pixel,
                 y + pixel,
@@ -236,6 +410,7 @@ public class MazePanel extends JPanel {
 
             // Dark stone shadow
             g.setColor(WALL_DARK);
+
             g.fillRect(
                 x + pixel,
                 y + cellSize - 2 * pixel,
@@ -247,6 +422,7 @@ public class MazePanel extends JPanel {
             if ((row * 7 + col * 11) % 4 == 0) {
 
                 g.setColor(MOSS);
+
                 g.fillRect(
                     x + pixel,
                     y + 2 * pixel,
@@ -256,9 +432,14 @@ public class MazePanel extends JPanel {
             }
         }
 
-        // Dark border between tiles
+        // Dark border
         g.setColor(Theme.BORDER);
-        g.drawRect(x, y, cellSize - 1, cellSize - 1);
+
+        g.drawRect(
+            x, y,
+            cellSize - 1,
+            cellSize - 1
+        );
     }
 
     // Weathered garden pathway
@@ -275,6 +456,7 @@ public class MazePanel extends JPanel {
 
             // Light stone highlight
             g.setColor(PATH_LIGHT);
+
             g.fillRect(
                 x + pixel,
                 y + pixel,
@@ -286,6 +468,7 @@ public class MazePanel extends JPanel {
             if ((row * 5 + col * 3) % 3 == 0) {
 
                 g.setColor(PATH_DARK);
+
                 g.fillRect(
                     x + cellSize - 3 * pixel,
                     y + cellSize - 3 * pixel,
@@ -296,7 +479,12 @@ public class MazePanel extends JPanel {
         }
 
         g.setColor(Theme.BORDER);
-        g.drawRect(x, y, cellSize - 1, cellSize - 1);
+
+        g.drawRect(
+            x, y,
+            cellSize - 1,
+            cellSize - 1
+        );
     }
 
     // Pixel-style Start and End markers
@@ -310,6 +498,7 @@ public class MazePanel extends JPanel {
 
         // Dark outer border
         g.setColor(Theme.BACKGROUND);
+
         g.fillRect(
             x + inset,
             y + inset,
@@ -321,6 +510,7 @@ public class MazePanel extends JPanel {
         int border = cellSize >= 12 ? 2 : 1;
 
         g.setColor(color);
+
         g.fillRect(
             x + inset + border,
             y + inset + border,
